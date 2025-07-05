@@ -1,7 +1,7 @@
 import numpy as np
 
 class PheromoneMap:
-    def __init__(self, shape, decay_rate=0.01):
+    def __init__(self, shape, decay_rate=0.05):
         """
         Generate a pheromone map.
 

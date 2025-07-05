@@ -1,7 +1,7 @@
 import numpy as np
 
 class Drone:
-    def __init__(self, x, y, field_shape):
+    def __init__(self, x, y, field_shape, failure_prob=0.0, controller=None):
         """
         Generate the drone at position (x, y).
 
@@ -13,7 +13,10 @@ class Drone:
         self.x = x
         self.y = y
         self.field_shape = field_shape
-        self.path = [(x, y)]  # Store path history
+        self.path = [(x, y)]
+        self.active = True
+        self.failure_prob = failure_prob
+        self.controller = controller
 
     def get_position(self):
         return self.x, self.y
@@ -35,6 +38,15 @@ class Drone:
         Choose the next cell to move to (based on crop health and pheromone):
         Move to the neighboring cell with the lowest (pheromone + crop health) score.
         """
+        if not self.active:
+            return
+
+        if self.controller is not None:
+            input_vector = self.build_input_vector(field, pheromone_map, radius)
+            action = np.argmax(self.controller.forward(input_vector))
+            self.apply_action(action, occupied_positions)
+            return
+
         crop_patch, pher_patch = self.sense(field, pheromone_map, radius)
         desirability = crop_patch + pher_patch
         center = radius
@@ -72,6 +84,8 @@ class Drone:
         """
         Leave pheromone at current position (x, y).
         """
+        if not self.active:
+            return
         pheromone_map_obj.deposit(self.x, self.y, amount)
 
     def _get_local_patch(self, grid, radius):
@@ -133,3 +147,28 @@ class Drone:
         flock_vec = w_sep * sep_vec + w_coh * coh_vec
         return flock_vec
 
+    def maybe_fail(self):
+        """
+        Randomly deactivate the drone based on failure probability.
+        """
+        if self.active and np.random.rand() < self.failure_prob:
+            self.active = False
+
+    def build_input_vector(self, field, pheromone_map, radius):
+        crop = self._get_local_patch(field, radius).flatten() / 2.0  # crop health: 0–2
+        pher = self._get_local_patch(pheromone_map, radius).flatten() / 5.0  # assume max pheromone ~5
+        visits = self._get_local_patch(self.visit_map_ref, radius).flatten()
+        visits = np.clip(visits, 0, 10) / 10.0  # normalize visit counts
+        return np.concatenate([crop, pher, visits])
+
+    def apply_action(self, action_index, occupied_positions):
+        moves = [(-1, 0), (1, 0), (0, -1), (0, 1), (0, 0)]  # N, S, W, E, stay
+        dx, dy = moves[action_index]
+        new_x, new_y = self.x + dx, self.y + dy
+
+        # Boundary + collision check
+        if 0 <= new_x < self.field_shape[0] and 0 <= new_y < self.field_shape[1]:
+            if (new_x, new_y) not in occupied_positions:
+                self.x = new_x
+                self.y = new_y
+                self.path.append((self.x, self.y))
