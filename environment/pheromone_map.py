@@ -59,7 +59,12 @@ class PheromoneMap:
         y_min = max(y - radius, 0)
         y_max = min(y + radius + 1, self.map.shape[1])
 
-        local = self.map[x_min:x_max, y_min:y_max]
+        patch = self.map[x_min:x_max, y_min:y_max]
+        patch += np.random.normal(0, 0.01, patch.shape)
+        pad_x = (max(0, radius - x), max(0, x + radius + 1 - self.map.shape[0]))
+        pad_y = (max(0, radius - y), max(0, y + radius + 1 - self.map.shape[1]))
+
+        local = np.pad(patch, (pad_x, pad_y), mode='constant', constant_values=0.0)
 
         return local
 

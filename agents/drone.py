@@ -1,7 +1,7 @@
 import numpy as np
 
 class Drone:
-    def __init__(self, x, y, field_shape, failure_prob=0.0, controller=None):
+    def __init__(self, x, y, field_shape, visit_map, failure_prob=0.0, controller=None):
         """
         Generate the drone at position (x, y).
 
@@ -17,6 +17,7 @@ class Drone:
         self.active = True
         self.failure_prob = failure_prob
         self.controller = controller
+        self.visit_map_ref = visit_map
 
     def get_position(self):
         return self.x, self.y
@@ -48,7 +49,9 @@ class Drone:
             return
 
         crop_patch, pher_patch = self.sense(field, pheromone_map, radius)
-        desirability = crop_patch + pher_patch
+        visit_patch = self._get_local_patch(self.visit_map_ref, radius)
+        visit_penalty = visit_patch / (np.max(visit_patch) + 1e-5)
+        desirability = crop_patch + 1/(1+pher_patch) + 2.0 * visit_penalty  # penalize revisits
         center = radius
         desirability[center, center] = np.inf  # discourage standing still
 
@@ -70,7 +73,8 @@ class Drone:
                 if 0 <= nx < self.field_shape[0] and 0 <= ny < self.field_shape[1]:
                     if (nx, ny) not in occupied_positions:
                         dist_to_target = np.linalg.norm([nx - target[0], ny - target[1]])
-                        score = desirability[dx + radius, dy + radius] + 0.5 * dist_to_target
+                        explore_weight = 1.0 if (nx, ny) in occupied_positions else 0.2
+                        score = desirability[dx + radius, dy + radius] + explore_weight * dist_to_target
                         candidates.append(((nx, ny), score))
 
         if not candidates:
@@ -156,10 +160,12 @@ class Drone:
 
     def build_input_vector(self, field, pheromone_map, radius):
         crop = self._get_local_patch(field, radius).flatten() / 2.0  # crop health: 0–2
-        pher = self._get_local_patch(pheromone_map, radius).flatten() / 5.0  # assume max pheromone ~5
+        pher = self._get_local_patch(pheromone_map, radius).flatten() / 5.0
         visits = self._get_local_patch(self.visit_map_ref, radius).flatten()
         visits = np.clip(visits, 0, 10) / 10.0  # normalize visit counts
-        return np.concatenate([crop, pher, visits])
+        pos_info = np.array([self.x / self.field_shape[0], self.y / self.field_shape[1]])
+
+        return np.concatenate([crop, pher, visits, pos_info])
 
     def apply_action(self, action_index, occupied_positions):
         moves = [(-1, 0), (1, 0), (0, -1), (0, 1), (0, 0)]  # N, S, W, E, stay
@@ -172,3 +178,5 @@ class Drone:
                 self.x = new_x
                 self.y = new_y
                 self.path.append((self.x, self.y))
+
+            self.path.append((self.x, self.y))

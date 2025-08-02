@@ -14,8 +14,8 @@ def evolve(
     generations=20,
     population_size=20,
     elite_fraction=0.2,
-    mutation_rate=0.1,
-    mutation_strength=0.3,
+    mutation_rate=0.2,
+    mutation_strength=0.4,
     seed=0
 ):
     np.random.seed(seed)
@@ -51,6 +51,11 @@ def evolve(
             parent = elites[np.random.randint(num_elite)]
             child = mutate(parent.copy(), mutation_rate, mutation_strength)
             new_population.append(child)
+
+        num_random = max(1, population_size // 10)
+        for _ in range(num_random):
+            random_weights = np.random.uniform(-1, 1, n_params)
+            new_population[-_ - 1] = random_weights
 
         population = new_population
 

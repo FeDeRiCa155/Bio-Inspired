@@ -27,13 +27,12 @@ def run_simulation(
     pheromone = PheromoneMap(grid_size, decay_rate=pheromone_decay)
 
     drones = []
-    for _ in range(num_drones):
+    for i in range(num_drones):
         x = np.random.randint(0, grid_size[0])
-        y = np.random.randint(0, grid_size[1])
+        y = np.random.randint(grid_size[1]//2 * (i % 2), grid_size[1])
         # drones.append(Drone(x, y, grid_size, failure_prob=failure_prob))
-        controller = NeuralController()  # or None for rule-based
-        drone = Drone(x, y, grid_size, controller=controller)
-        drone.visit_map_ref = visit_map  # Attach visit map reference
+        controller = NeuralController()
+        drone = Drone(x, y, grid_size, controller=controller, visit_map=visit_map)
         drones.append(drone)
 
     for t in range(timesteps):
@@ -49,7 +48,7 @@ def run_simulation(
             drone.deposit_pheromone(pheromone)
 
         pheromone.update()
-        num_failed = sum(not d.active for d in drones)
-        print(f"Simulation complete. {num_failed}/{num_drones} drones failed.")
+    num_failed = sum(not d.active for d in drones)
+    print(f"Simulation complete. {num_failed}/{num_drones} drones failed.")
 
     return field, pheromone, drones, visit_map

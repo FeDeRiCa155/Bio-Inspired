@@ -1,25 +1,36 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import csv
+
 from agents.neural_controller import NeuralController
 from evolution.evolve import evolve
-from evolution.evaluate import evaluate_controller
-from visual.plotter import plot_field_with_paths, plot_visit_heatmap
 from simulation.loop import run_simulation
 from simulation.metrics import compute_all_metrics
+from visual.plotter import (
+    plot_field_with_paths,
+    plot_pheromone_map,
+    plot_visit_heatmap
+)
 
-best_weights, history = evolve(generations=30)
+# train controller
+best_weights, history = evolve(generations=30, population_size=30)
 controller = NeuralController(weights=best_weights)
 
+# simulation loop
 field, pheromone, drones, visit_map = run_simulation(
     grid_size=(20, 20),
     num_drones=5,
     timesteps=300,
-    failure_prob=0.0
+    failure_prob=0.0,
+    seed=42
 )
 
 for drone in drones:
     drone.controller = controller
     drone.visit_map_ref = visit_map
 
-for t in range(100):
+# post-training simulation
+for _ in range(100):
     active_drones = [d for d in drones if d.active]
     occupied = {(d.x, d.y) for d in active_drones}
     all_pos = [(d.x, d.y) for d in active_drones]
@@ -31,13 +42,17 @@ for t in range(100):
         drone.deposit_pheromone(pheromone)
     pheromone.update()
 
+# metrics
+metrics = compute_all_metrics(visit_map, drones)
+
+print("\n-----Simulation Metrics")
+for k, v in metrics.items():
+    print(f"{k}: {v:.2f}" if isinstance(v, float) else f"{k}: {v}")
+
+# Plots
 plot_field_with_paths(field, drones)
 plot_visit_heatmap(visit_map)
-metrics = compute_all_metrics(visit_map, drones)
-print(metrics)
-
-
-import matplotlib.pyplot as plt
+plot_pheromone_map(pheromone.map)
 
 best, mean = zip(*history)
 plt.plot(best, label="Best")
@@ -48,3 +63,4 @@ plt.title("Evolution Progress")
 plt.legend()
 plt.grid(True)
 plt.show()
+

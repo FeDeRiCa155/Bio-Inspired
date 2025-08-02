@@ -1,7 +1,7 @@
 import numpy as np
 
 class NeuralController:
-    def __init__(self, input_size=27, hidden_size=16, output_size=5, weights=None):
+    def __init__(self, input_size=29, hidden_size=16, output_size=5, weights=None):
         """
         A simple 1-hidden-layer neural network with ReLU activation.
         """

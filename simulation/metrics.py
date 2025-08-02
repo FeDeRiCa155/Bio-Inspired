@@ -17,3 +17,32 @@ def compute_energy(drones):
 
 def compute_failures(drones):
     return sum(not d.active for d in drones)
+
+def compute_explored_rows(visit_map):
+    return np.count_nonzero(np.sum(visit_map, axis=1))
+
+def compute_explored_row_ratio(visit_map):
+    return compute_explored_rows(visit_map) / visit_map.shape[0] * 100
+
+def compute_fitness(coverage, overlap, energy, explored_row_ratio,
+                    w1=3.0, w2=3.0, w3=0.5, w4=2.0):
+    return w1 * coverage - w2 * overlap - w3 * energy + w4 * explored_row_ratio
+
+
+def compute_all_metrics(visit_map, drones):
+    coverage = compute_coverage(visit_map)
+    overlap = compute_overlap(visit_map)
+    energy, std = compute_energy(drones)
+    failures = compute_failures(drones)
+    explored_row_ratio = compute_explored_row_ratio(visit_map)
+
+    return {
+        "coverage": coverage,
+        "overlap": overlap,
+        "energy_mean": energy,
+        "energy_std": std,
+        "failures": failures,
+        "explored_row_ratio": explored_row_ratio,
+        "fitness": compute_fitness(coverage, overlap, energy, explored_row_ratio)
+    }
+
