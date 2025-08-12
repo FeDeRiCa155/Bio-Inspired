@@ -41,6 +41,11 @@ def generate_field(rows, cols, seed=None):
         i, j = divmod(idx, cols)
         field[i, j] = 0.6
 
+    # noise
+    noise = np.random.normal(0, 0.05, field.shape)
+    field += noise
+    field = np.clip(field, 0.2, 1.0)
+
     return field
 
 
@@ -60,8 +65,3 @@ def display_field(field):
     plt.ylabel('Row')
     plt.show()
 
-
-# Example usage
-if __name__ == "__main__":
-    test_field = generate_field(rows=30, cols=30, seed=42)
-    display_field(test_field)

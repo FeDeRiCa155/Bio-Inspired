@@ -4,11 +4,28 @@ from agents.drone import Drone
 from environment.field import generate_field
 from environment.pheromone_map import PheromoneMap
 from simulation.metrics import compute_fitness
+from simulation.loop import generate_start_positions
 
-def evaluate_controller(weights, grid_size=(20, 20), num_drones=5, timesteps=100, seeds = [42, 17, 73, 101, 123, 256, 512]):
+# def generate_start_positions(grid_size, num_drones):
+#     """
+#     Evenly spread initial positions in the field to promote exploration.
+#     """
+#     positions = []
+#     step_x = grid_size[0] // (num_drones + 1)
+#     step_y = grid_size[1] // (num_drones + 1)
+#
+#     for i in range(1, num_drones + 1):
+#         x = step_x * i
+#         y = step_y * i
+#         positions.append((x, y))
+#
+#     return positions
+
+def evaluate_controller(weights, grid_size=(20, 20), num_drones=5, timesteps=100,
+                        seeds=[42, 17, 73, 101, 123, 256, 512, 12, 65, 15]):
     """
-    Evaluate one neural controller's performance over multiple random seeds.
-    Returns the average fitness across runs.
+    Evaluate a neural controller by averaging fitness over multiple seeds.
+    Strongly rewards coverage and penalizes clustering.
     """
     fitnesses = []
 
@@ -21,15 +38,14 @@ def evaluate_controller(weights, grid_size=(20, 20), num_drones=5, timesteps=100
 
         controller = NeuralController(weights=weights)
 
-        # Drones
-        drones = []
-        for _ in range(num_drones):
-            x = np.random.randint(0, grid_size[0])
-            y = np.random.randint(0, grid_size[1])
-            drone = Drone(x, y, grid_size, visit_map, controller=controller, failure_prob=0.0)
-            drones.append(drone)
+        # Init drones
+        start_positions = generate_start_positions(grid_size, num_drones)
+        drones = [Drone(x, y, grid_size, controller=controller, visit_map=visit_map)
+                  for (x, y) in start_positions]
 
-        # Simulation loop
+        # Track coverage over time
+        coverage_progress = []
+
         for t in range(timesteps):
             active_drones = [d for d in drones if d.active]
             occupied_positions = {(d.x, d.y) for d in active_drones}
@@ -44,17 +60,35 @@ def evaluate_controller(weights, grid_size=(20, 20), num_drones=5, timesteps=100
 
             pheromone.update()
 
+            # Save coverage progression
+            coverage_progress.append(np.count_nonzero(visit_map) / visit_map.size)
+
         # Metrics
-        coverage = np.count_nonzero(visit_map) / visit_map.size * 100
+        coverage = np.count_nonzero(visit_map) / visit_map.size
         total_visits = np.sum(visit_map)
         unique_visits = np.count_nonzero(visit_map)
-        overlap = (total_visits - unique_visits) / total_visits * 100 if total_visits > 0 else 0
+        overlap = (total_visits - unique_visits) / total_visits if total_visits > 0 else 0
         energy = np.mean([len(d.path) - 1 for d in drones if d.active])
 
-        explored_rows = np.count_nonzero(np.sum(visit_map, axis=1))
-        explored_row_ratio = explored_rows / grid_size[0] * 100
-        coverage_reward = explored_rows / grid_size[0] * 100
-        fitness = compute_fitness(coverage, overlap, energy, explored_row_ratio)
+        explored_row_ratio = np.count_nonzero(np.sum(visit_map, axis=1)) / grid_size[0]
+        explored_col_ratio = np.count_nonzero(np.sum(visit_map, axis=0)) / grid_size[1]
+
+        # New: Penalize pheromone concentration
+        max_phero_ratio = np.max(pheromone.map) / (np.sum(pheromone.map) + 1e-6)
+
+        # New: Reward for still finding new cells near the end
+        late_exploration_bonus = coverage_progress[-1] - coverage_progress[int(0.5 * timesteps)]
+
+        # Fitness: coverage dominates
+        fitness = (
+            5.0 * coverage
+            - 5.0 * overlap
+            - 0.5 * energy
+            + 1.0 * explored_row_ratio
+            + 1.0 * explored_col_ratio
+            + 2.0 * late_exploration_bonus
+            - 5.0 * max_phero_ratio
+        )
         fitnesses.append(fitness)
 
     return np.mean(fitnesses)

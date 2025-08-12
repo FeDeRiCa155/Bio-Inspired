@@ -2,37 +2,40 @@ import numpy as np
 from agents.neural_controller import NeuralController
 from evolution.evaluate import evaluate_controller
 
-def mutate(weights, mutation_rate=0.5, mutation_strength=0.5):
-    """
-    Add Gaussian noise to weights.
-    """
-    noise = np.random.randn(*weights.shape) * mutation_strength
-    mask = np.random.rand(*weights.shape) < mutation_rate
-    return weights + noise * mask
 
 def crossover(parent1, parent2):
-    """
-    Crossover two parents.
-    """
-    mask = np.random.rand(*parent1.shape) < 0.5
-    return np.where(mask, parent1, parent2)
+    """Uniform crossover."""
+    mask = np.random.rand(len(parent1)) < 0.5
+    child = np.where(mask, parent1, parent2)
+    return child
 
-def tournament_selection(pop, fitness, k=3):
-    selected = np.random.choice(len(pop), k, replace=False)
-    best_idx = selected[np.argmax([fitness[i] for i in selected])]
-    return pop[best_idx]
+
+def mutate(weights, mutation_rate, mutation_strength):
+    """Gaussian mutation."""
+    for i in range(len(weights)):
+        if np.random.rand() < mutation_rate:
+            weights[i] += np.random.randn() * mutation_strength
+    return weights
+
+
+def tournament_selection(population, fitness_scores, k=3):
+    """Tournament selection."""
+    indices = np.random.choice(len(population), k, replace=False)
+    best_idx = max(indices, key=lambda idx: fitness_scores[idx])
+    return population[best_idx]
+
 
 def evolve(
-    generations=30,
+    generations=20,
     population_size=30,
     elite_fraction=0.1,
-    mutation_rate=0.5,
+    mutation_rate=0.3,
     mutation_strength=0.4,
     seed=1
 ):
     np.random.seed(seed)
 
-    # Random population
+    # Initialize random population
     sample_net = NeuralController()
     n_params = sample_net.n_params
     population = [np.random.uniform(-1, 1, n_params) for _ in range(population_size)]
@@ -44,10 +47,11 @@ def evolve(
     restart_counter = 0
 
     for gen in range(generations):
-        # Evaluation
+
+        # Evaluate population
         fitness_scores = [evaluate_controller(ind) for ind in population]
 
-        # Sort by fitness (higher = better)
+        # Sort by fitness
         sorted_indices = np.argsort(fitness_scores)[::-1]
         population = [population[i] for i in sorted_indices]
         fitness_scores = [fitness_scores[i] for i in sorted_indices]
@@ -58,32 +62,37 @@ def evolve(
         print(f"[Gen {gen}] Best: {best_fitness:.2f} | Mean: {mean_fitness:.2f} | Std: {std_fitness:.2f}")
         history.append((best_fitness, mean_fitness))
 
+        # Save improvement
         if best_fitness > best_so_far + 1e-6:
             best_so_far = best_fitness
             stagnation_counter = 0
+            np.save("best_weights.npy", population[0])
+            print(f"[Gen {gen}] New best: {best_fitness:.2f} (saved)")
         else:
             stagnation_counter += 1
 
-        # Select best (elites)
-        num_elite = int(population_size * elite_fraction)
+        # Select elites
+        num_elite = max(1, int(population_size * elite_fraction))
         elites = population[:num_elite]
 
-        # Reproduction via mutation
+        # Adaptive mutation rate
+        current_mut_rate = max(0.1, mutation_rate * (0.97 ** gen))
+
+        # Reproduce new population
         new_population = elites.copy()
         while len(new_population) < population_size:
             p1 = tournament_selection(population, fitness_scores, k=3)
             p2 = tournament_selection(population, fitness_scores, k=3)
-            # p1 = elites[np.random.randint(num_elite)]
-            # p2 = elites[np.random.randint(num_elite)]
             child = crossover(p1, p2)
-            child = mutate(child, mutation_rate, mutation_strength)
+            child = mutate(child, current_mut_rate, mutation_strength)
             new_population.append(child)
 
+        # Inject some random individuals for diversity
         num_random = max(1, population_size // 10)
-        worst_indices = sorted_indices[-num_random:]
-        for idx in worst_indices:
-            new_population.append(np.random.uniform(-1, 1, n_params))
+        for _ in range(num_random):
+            new_population[np.random.randint(num_elite, population_size)] = np.random.uniform(-1, 1, n_params)
 
+        # Handle stagnation
         if stagnation_counter >= max_stagnation:
             print(f"Restarting some of the population due to stagnation")
             restart_counter += 1
@@ -98,6 +107,17 @@ def evolve(
 
         population = new_population
 
-    # Return best controller
-    best_weights = population[0]
-    return best_weights, history
+    return population[0], history
+
+
+if __name__ == "__main__":
+    best_weights, history = evolve(
+        generations=20,
+        population_size=30,
+        elite_fraction=0.1,
+        mutation_rate=0.5,
+        mutation_strength=0.4,
+        seed=1
+    )
+    print("Best weights saved to best_weights.npy")
+
