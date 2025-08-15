@@ -16,7 +16,8 @@ visit_map = np.zeros(grid_size, dtype=int)
 drone = Drone(x=0, y=0, field_shape=grid_size, controller=controller, visit_map=visit_map)
 field = generate_field(*grid_size, seed=42)
 
-for step in range(10):
+timesteps = 100
+for step in range(timesteps):
     drone.decide_and_move(
         field=field,
         pheromone_map=pheromone.map,

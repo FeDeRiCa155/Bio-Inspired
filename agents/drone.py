@@ -70,10 +70,7 @@ class Drone:
                 return
 
         if self.controller is not None:
-            # input_vector = self.build_input_vector(field, pheromone_map, radius)
-            # action = np.argmax(self.controller.forward(input_vector))
-            # self.apply_action(action, occupied_positions)
-            # return
+
             input_vector = self.build_input_vector(field, pheromone_map, radius)
             logits = self.controller.forward(input_vector)
             mask = self.valid_action_mask(occupied_positions)

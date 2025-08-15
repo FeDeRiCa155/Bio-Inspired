@@ -6,21 +6,6 @@ from environment.pheromone_map import PheromoneMap
 from simulation.metrics import compute_fitness
 from simulation.loop import generate_start_positions
 
-# def generate_start_positions(grid_size, num_drones):
-#     """
-#     Evenly spread initial positions in the field to promote exploration.
-#     """
-#     positions = []
-#     step_x = grid_size[0] // (num_drones + 1)
-#     step_y = grid_size[1] // (num_drones + 1)
-#
-#     for i in range(1, num_drones + 1):
-#         x = step_x * i
-#         y = step_y * i
-#         positions.append((x, y))
-#
-#     return positions
-
 def evaluate_controller(weights, grid_size=(20, 20), num_drones=5, timesteps=100,
                         seeds=[42, 17, 73, 101, 123, 256, 512, 12, 65, 15]):
     """

@@ -12,10 +12,10 @@ def crossover(parent1, parent2):
 
 def mutate(weights, mutation_rate, mutation_strength):
     """Gaussian mutation."""
-    for i in range(len(weights)):
-        if np.random.rand() < mutation_rate:
-            weights[i] += np.random.randn() * mutation_strength
-    return weights
+    w = weights.copy()
+    mask = np.random.rand(w.size) < mutation_rate
+    w[mask] += np.random.randn(mask.sum()) * mutation_strength
+    return w
 
 
 def tournament_selection(population, fitness_scores, k=3):
@@ -23,6 +23,21 @@ def tournament_selection(population, fitness_scores, k=3):
     indices = np.random.choice(len(population), k, replace=False)
     best_idx = max(indices, key=lambda idx: fitness_scores[idx])
     return population[best_idx]
+
+
+def _eval_single(weights, s):
+    """Call evaluate_controller; try passing seed, else set global seed."""
+    try:
+        return evaluate_controller(weights, seed=s)
+    except TypeError:
+        np.random.seed(int(s))
+        return evaluate_controller(weights)
+
+
+def eval_fitness_mean(weights, seeds):
+    """Average fitness across seeds."""
+    scores = np.array([_eval_single(weights, s) for s in seeds], dtype=float)
+    return float(scores.mean())
 
 
 def evolve(
