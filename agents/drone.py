@@ -65,7 +65,8 @@ class Drone:
                         if (nx, ny) not in occupied_positions:
                             possible_moves.append((nx, ny))
             if possible_moves:
-                self.x, self.y = possible_moves[np.random.randint(len(possible_moves))]
+                # self.x, self.y = possible_moves[np.random.randint(len(possible_moves))]
+                self.x, self.y = min(possible_moves, key=lambda p: pheromone_map[p])
                 self.path.append((self.x, self.y))
                 return
 
@@ -105,9 +106,9 @@ class Drone:
         col_bonus = 1.0 - (col_visits[self.y] / (np.max(col_visits) + 1e-5))
         explore_bonus = (1.0 - visit_penalty) * anti_pher
 
-        w_crop, w_pher, w_visit, w_explore, w_row, w_col = 0.5, 1.2, 1.5, 5.0, 0.8, 0.8
+        w_crop, w_pher, w_visit, w_explore, w_row, w_col = 1.0, 1.5, 1.5, 5.0, 0.8, 0.8
         desirability = (
-                w_crop * crop_patch
+                - w_crop * crop_patch
                 - w_pher * pher_norm
                 - w_visit * visit_penalty
                 + w_explore * explore_bonus * explore_pressure

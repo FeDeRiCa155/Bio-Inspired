@@ -31,7 +31,7 @@ def compute_explored_col_ratio(visit_map):
     return compute_explored_cols(visit_map) / visit_map.shape[0] * 100
 
 def compute_fitness(coverage, overlap, energy, explored_row_ratio, explore_col_ratio,
-                    w1=20.0, w2=10.0, w3=0.5, w4=2.0, w5=2.0, reg_strength=0.001):
+                    w1=20.0, w2=20.0, w3=0.5, w4=2.0, w5=2.5, reg_strength=0.001):
     fitness = w1 * coverage - w2 * overlap - w3 * energy + w4 * explored_row_ratio + w5 * explore_col_ratio
     fitness -= reg_strength * (w1**2 + w2**2 + w3**2 + w4**2 + w5**2)
     return fitness

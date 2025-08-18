@@ -1,7 +1,7 @@
 import numpy as np
 from agents.neural_controller import NeuralController
 from evolution.evaluate import evaluate_controller
-
+# from evolution.evolve import evolve
 
 def crossover(parent1, parent2):
     """Uniform crossover."""
@@ -64,7 +64,11 @@ def evolve(
     for gen in range(generations):
 
         # Evaluate population
-        fitness_scores = [evaluate_controller(ind) for ind in population]
+        # fitness_scores = [evaluate_controller(ind) for ind in population]
+        seeds_train = [1, 15, 42, 38, 95, 63, 100, 7, 37]
+        lambda_l2 = 1e-3
+        fitness_scores = [evaluate_controller(ind, grid_size=(25, 25), seeds=seeds_train) - lambda_l2 * float(np.dot(ind, ind))
+                          for ind in population]
 
         # Sort by fitness
         sorted_indices = np.argsort(fitness_scores)[::-1]
@@ -81,7 +85,7 @@ def evolve(
         if best_fitness > best_so_far + 1e-6:
             best_so_far = best_fitness
             stagnation_counter = 0
-            np.save("best_weights.npy", population[0])
+            np.save("best_weights_25_5.npy", population[0])
             print(f"[Gen {gen}] New best: {best_fitness:.2f} (saved)")
         else:
             stagnation_counter += 1
@@ -114,7 +118,7 @@ def evolve(
             restart_pop = int(0.7 * population_size)
             for i in range(population_size - restart_pop, population_size):
                 new_population[i] = np.random.uniform(-1, 1, n_params)
-            if restart_counter % 3:
+            if restart_counter % 5 == 0:
                 print("Elite replaced")
                 new_population[0] = np.random.uniform(-1, 1, n_params)
                 restart_counter = 0
@@ -127,12 +131,12 @@ def evolve(
 
 if __name__ == "__main__":
     best_weights, history = evolve(
-        generations=20,
+        generations=30,
         population_size=30,
-        elite_fraction=0.1,
+        elite_fraction=0.15,
         mutation_rate=0.5,
-        mutation_strength=0.4,
-        seed=1
+        mutation_strength=0.5,
+        seed=15
     )
-    print("Best weights saved to best_weights.npy")
+    print("Best weights saved")
 

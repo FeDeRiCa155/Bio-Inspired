@@ -56,20 +56,30 @@ def run_simulation(
 
     drones = []
     for (x, y) in start_positions:
-        drone = Drone(x, y, grid_size, controller=controller, visit_map=visit_map)
+        drone = Drone(x, y, grid_size, controller=controller, visit_map=visit_map, failure_prob=failure_prob)
         drones.append(drone)
 
     for t in range(timesteps):
-        active_drones = [d for d in drones if d.active]
-        occupied_positions = {(d.x, d.y) for d in active_drones}
-        all_positions = [(d.x, d.y) for d in active_drones]
+        active = [d for d in drones if d.active]
+        occupied_positions = {(d.x, d.y) for d in active}
+        all_positions = [(d.x, d.y) for d in active]
 
         for drone in drones:
             drone.maybe_fail()
+            if not drone.active:
+                continue
+
+            old = (drone.x, drone.y)
+            occupied_positions.discard(old)
+
             drone.decide_and_move(field, pheromone.map, occupied_positions, all_positions=all_positions)
-            if drone.active:
+
+            moved = (drone.x, drone.y) != old
+            if moved and drone.active:
                 visit_map[drone.x, drone.y] += 1
-            drone.deposit_pheromone(pheromone)
+                drone.deposit_pheromone(pheromone)
+
+            occupied_positions.add((drone.x, drone.y))
 
         pheromone.update()
 

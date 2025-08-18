@@ -90,7 +90,7 @@ def evolve(
             restart_pop = int(0.7 * population_size)
             for i in range(population_size - restart_pop, population_size):
                 new_population[i] = np.random.uniform(-1, 1, n_params)
-            if restart_counter % 3:
+            if restart_counter % 3 == 0:
                 print("Elite replaced")
                 new_population[0] = np.random.uniform(-1, 1, n_params)
                 restart_counter = 0
