@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import csv
 
 from agents.neural_controller import NeuralController
-from evolution.evolve import evolve
+from simulation.run_GA import evolve
 from simulation.loop import run_simulation, generate_start_positions
 from simulation.metrics import compute_all_metrics, compute_fitness
 from evolution.evaluate import evaluate_controller
@@ -14,11 +14,11 @@ from visual.plotter import (
 )
 
 # train controller
-# best_weights, history = evolve(generations=20, population_size=30)
-best_weights = np.load("simulation/best_weights_25_5.npy")
+best_weights, history = evolve(generations=20, population_size=50)
+# best_weights = np.load("best_weights_25.npy") # best_weights_25_try2.npy
 controller = NeuralController(weights=best_weights)
 
-num_drones = 5
+num_drones = 2
 # simulation
 start_positions = generate_start_positions(grid_size=(25, 25), num_drones=num_drones)
 field, pheromone, drones, visit_map = run_simulation(
@@ -26,7 +26,7 @@ field, pheromone, drones, visit_map = run_simulation(
     num_drones=num_drones,
     timesteps=200,
     failure_prob=0.0,
-    seed=70,
+    seed=69,
     controller=controller,
     start_positions=start_positions
 )
@@ -37,7 +37,7 @@ metrics = compute_all_metrics(visit_map, drones)
 print("\n-----Simulation Metrics")
 for k, v in metrics.items():
     print(f"{k}: {v:.2f}" if isinstance(v, float) else f"{k}: {v}")
-# final_score = evaluate_controller(controller.get_weights(), timesteps=100, seeds=[999, 1001, 1002])
+# final_score = evaluate_controller(controller.get_weights(), timesteps=100, seeds=[999, 1001, 1005])
 # print(f"Final Evaluation on Unseen Seeds: Avg Fitness = {final_score:.2f}")
 
 # Plots

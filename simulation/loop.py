@@ -27,8 +27,8 @@ def generate_start_positions(grid_size, num_drones):
 def run_simulation(
     grid_size=(30, 30),
     num_drones=10,
-    timesteps=100,
-    pheromone_decay=0.01,
+    timesteps=300,
+    pheromone_decay=0.05,
     seed=42,
     failure_prob=0.01,
     controller=None,
@@ -61,25 +61,28 @@ def run_simulation(
 
     for t in range(timesteps):
         active = [d for d in drones if d.active]
+        order = np.random.permutation(len(active))
         occupied_positions = {(d.x, d.y) for d in active}
         all_positions = [(d.x, d.y) for d in active]
 
-        for drone in drones:
-            drone.maybe_fail()
-            if not drone.active:
+        for k in order:
+            d = active[k]
+            d.maybe_fail()
+            if not d.active:
                 continue
 
-            old = (drone.x, drone.y)
+            old = (d.x, d.y)
             occupied_positions.discard(old)
 
-            drone.decide_and_move(field, pheromone.map, occupied_positions, all_positions=all_positions)
+            d.decide_and_move(field, pheromone.map, occupied_positions, all_positions)
 
-            moved = (drone.x, drone.y) != old
-            if moved and drone.active:
-                visit_map[drone.x, drone.y] += 1
-                drone.deposit_pheromone(pheromone)
+            moved = (d.x, d.y) != old
+            if moved and d.active:
+                visit_map[d.x, d.y] += 1
+                d.deposit_pheromone(pheromone)
 
-            occupied_positions.add((drone.x, drone.y))
+            occupied_positions.add((d.x, d.y))
+            all_positions.append((d.x, d.y))
 
         pheromone.update()
 

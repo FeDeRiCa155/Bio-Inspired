@@ -49,43 +49,92 @@ class Drone:
             return
 
         # e-greedy exploration
-        epsilon_start = 0.3
-        epsilon_end = 0.02
+        epsilon_start = 0.02
+        epsilon_end = 0.001
         decay_rate = 0.998
         epsilon = epsilon_end + (epsilon_start - epsilon_end) * (decay_rate ** self.steps_taken)
 
-        if np.random.rand() < epsilon:
-            possible_moves = []
-            for dx in range(-1, 2):
-                for dy in range(-1, 2):
-                    if dx == 0 and dy == 0:
-                        continue
-                    nx, ny = self.x + dx, self.y + dy
-                    if 0 <= nx < self.field_shape[0] and 0 <= ny < self.field_shape[1]:
-                        if (nx, ny) not in occupied_positions:
-                            possible_moves.append((nx, ny))
-            if possible_moves:
-                # self.x, self.y = possible_moves[np.random.randint(len(possible_moves))]
-                self.x, self.y = min(possible_moves, key=lambda p: pheromone_map[p])
-                self.path.append((self.x, self.y))
-                return
-
         if self.controller is not None:
-
-            input_vector = self.build_input_vector(field, pheromone_map, radius)
-            logits = self.controller.forward(input_vector)
+            x = self.build_input_vector(field, pheromone_map, radius)
+            nn = self.controller.forward(x).astype(float)  # raw NN logits
             mask = self.valid_action_mask(occupied_positions)
-            epsilon = epsilon_end + (epsilon_start - epsilon_end) * (decay_rate ** self.steps_taken)
 
             if np.random.rand() < epsilon:
-                valid_moves = np.where(mask)[0]
-                if len(valid_moves) == 0:
-                    valid_moves = [4]
-                action = np.random.choice(valid_moves)
-            else:
-                logits = np.where(mask, logits, -1e9)
-                best = np.flatnonzero(logits == logits.max())
-                action = np.random.choice(best)
+                valid_idxs = np.flatnonzero(mask)
+                if valid_idxs.size == 0:
+                    self.apply_action(4, occupied_positions)
+                    self.steps_taken += 1
+                    return
+                if 4 in valid_idxs and valid_idxs.size > 1:
+                    valid_idxs = valid_idxs[valid_idxs != 4]
+                action = int(np.random.choice(valid_idxs))
+                self.apply_action(action, occupied_positions)
+                self.steps_taken += 1
+                return
+
+            if len(self.path) >= 2:
+                px, py = self.path[-2]
+                back_a = None
+                for a, (dx, dy) in enumerate(self.MOVES[:4]):  # only movement actions
+                    nx, ny = self.x + dx, self.y + dy
+                    if (nx, ny) == (px, py):
+                        back_a = a
+                        break
+                if back_a is not None and np.sum(mask[:4]) > 1:
+                    mask[back_a] = False
+
+            H, W = self.field_shape
+            local_pher = np.full(5, 0.0)
+            wall_bias = np.full(5, 0.0)
+            poor_crop = np.full(5, 0.0)
+            low_visit = np.full(5, 0.0)  # higher = less visited (what we want)
+
+            # global crop scale (matches evaluator’s stress)
+            fmin, fmax = field.min(), field.max()
+            # local pher scale
+            p_patch = self._get_local_patch(pheromone_map, radius)
+            pmin, pmax = p_patch.min(), p_patch.max()
+            pden = (pmax - pmin + 1e-6)
+
+            for a, (dx, dy) in enumerate(self.MOVES):
+                nx, ny = self.x + dx, self.y + dy
+                if 0 <= nx < H and 0 <= ny < W:
+                    health = (field[nx, ny] - fmin) / (fmax - fmin + 1e-9)
+                    poor_crop[a] = 1.0 - health  # prefer sick
+                    local_pher[a] = (pheromone_map[nx, ny] - pmin) / pden
+                    wall_bias[a] = min(nx, ny, H - 1 - nx, W - 1 - ny) / max(1, min(H, W) // 2)
+                    v = self.visit_map_ref[nx, ny]
+                    low_visit[a] = 1.0 / (1.0 + v)
+
+            # standardize over valid actions so weights are comparable
+            def z(v):
+                vm = v[mask]
+                m = vm.mean() if vm.size else 0.0
+                s = vm.std() if vm.size else 1.0
+                return (v - m) / (s + 1e-6)
+
+            score = (
+                    0.7 * z(nn)  # learned preference
+                    + 1.2 * z(low_visit)
+                    + 0.8 * z(poor_crop)
+                    - 0.6 * z(local_pher)
+                    + 0.2 * z(wall_bias)
+            )
+
+            if all_positions is not None:
+                sep = np.zeros(5)
+                for a, (dx, dy) in enumerate(self.MOVES[:4]):  # exclude stay
+                    nx, ny = self.x + dx, self.y + dy
+                    if 0 <= nx < H and 0 <= ny < W:
+                        for px, py in all_positions:
+                            if (px, py) != (self.x, self.y) and abs(px - nx) <= 1 and abs(py - ny) <= 1:
+                                sep[a] += 1.0
+                score = score - 0.1 * z(sep)
+
+            # pick action
+            score = np.where(mask, score, -1e9)
+            score = score + 1e-6 * np.random.randn(*score.shape)  # tie-break
+            action = int(np.argmax(score))
 
             self.apply_action(action, occupied_positions)
             self.steps_taken += 1
@@ -233,15 +282,16 @@ class Drone:
     def valid_action_mask(self, occupied_positions):
         H, W = self.field_shape
         mask = np.zeros(5, dtype=bool)
-        for a, (dx, dy) in enumerate(self.MOVES):
+
+        movable = False
+        for a, (dx, dy) in enumerate(self.MOVES[:4]):
             nx, ny = self.x + dx, self.y + dy
-            if 0 <= nx < H and 0 <= ny < W:
-                if (dx, dy) == (0, 0):
-                    mask[a] = True
-                else:
-                    mask[a] = (nx, ny) not in occupied_positions
-            else:
-                mask[a] = False
+            ok = (0 <= nx < H) and (0 <= ny < W) and ((nx, ny) not in occupied_positions)
+            mask[a] = ok
+            movable |= ok
+
+        # allow stay only if nothing else is possible
+        mask[4] = not movable
         return mask
 
     def apply_action(self, action_index, occupied_positions):

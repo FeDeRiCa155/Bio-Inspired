@@ -51,13 +51,6 @@ class NeuralController:
         return np.clip(x, -3.0, 3.0)
 
     def forward(self, x):
-        """
-        Compute output vector from input vector x.
-        Args:
-            x (np.ndarray): shape (29,)
-        Returns:
-            np.ndarray: shape (5,), action scores
-        """
         x = self._normalize(x)
         z1 = self.W1 @ x + self.b1
         a1 = np.maximum(0, z1)  # ReLU

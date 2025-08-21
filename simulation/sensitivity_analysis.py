@@ -60,7 +60,7 @@ def main():
     parser.add_argument("--fail_probs", type=float, nargs="+", default=[0.0, 0.005, 0.01, 0.05],
                         help="Failure probabilities to test")
     parser.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5], help="Seeds for repetition")
-    parser.add_argument("--weights", type=str, default="best_weights.npy",
+    parser.add_argument("--weights", type=str, default="best_weights_25_try2.npy",
                         help="Path to weights for neuro controller (if not training)")
     parser.add_argument("--train", action="store_true",
                         help="If set, evolve a controller now instead of loading weights.")
