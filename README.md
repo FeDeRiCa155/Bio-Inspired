@@ -1,4 +1,4 @@
-# Bio-Inspired REPOSITORY
+# Bio-Inspired Coordination for Agricultural Crop Monitoring - REPOSITORY
 This repository contains the code for the AE4350 assignment on bio-inspired intelligence for aerospace applications. 
 
 
